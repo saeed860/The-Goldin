@@ -1,0 +1,61 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+
+enum UserStatus { PENDING ACTIVE SUSPENDED }
+enum OrderSide { BUY SELL }
+enum OrderStatus { CREATED PENDING CONFIRMED REJECTED CANCELLED }
+enum LedgerDirection { CREDIT DEBIT }
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  status       UserStatus   @default(PENDING)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  wallets      Wallet[]
+  orders       Order[]
+  auditLogs    AuditLog[]
+}
+model Wallet {
+  id        String   @id @default(cuid())
+  userId    String
+  asset     String
+  balance   Decimal  @default(0) @db.Decimal(30,10)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields:[userId], references:[id])
+  entries   LedgerEntry[]
+  @@unique([userId, asset])
+}
+model LedgerEntry {
+  id          String          @id @default(cuid())
+  walletId    String
+  direction   LedgerDirection
+  amount      Decimal         @db.Decimal(30,10)
+  reference   String          @unique
+  description String?
+  createdAt   DateTime        @default(now())
+  wallet      Wallet          @relation(fields:[walletId], references:[id])
+}
+model Order {
+  id             String      @id @default(cuid())
+  userId         String
+  side           OrderSide
+  asset          String
+  quantity       Decimal     @db.Decimal(30,10)
+  unitPrice      Decimal     @db.Decimal(30,10)
+  fee            Decimal     @db.Decimal(30,10)
+  status         OrderStatus @default(CREATED)
+  idempotencyKey String      @unique
+  createdAt      DateTime    @default(now())
+  user           User        @relation(fields:[userId], references:[id])
+}
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  metadata  Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields:[userId], references:[id])
+}
